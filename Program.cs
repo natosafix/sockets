@@ -159,9 +159,67 @@ namespace Sockets
 
         private static byte[] ProcessRequest(Request request)
         {
-            // TODO
-            var head = new StringBuilder("OK");
-            var body = new byte[0];
+            var head = new StringBuilder("HTTP/1.1 ");
+            byte[] body;
+            var requestUriSplit = request.RequestUri.Split("?");
+            var requestPath = requestUriSplit[0];
+            var queryParams = requestUriSplit.Length > 1 ? HttpUtility.ParseQueryString(requestUriSplit[1]) : new NameValueCollection();
+            string data;
+            switch (requestPath)
+            {
+                case "/" or "/hello.html":
+                    head.Append("200 OK\r\nContent-Type: text/html; charset=utf-8\r\n");
+                    data = File.ReadAllText("hello.html");
+
+                    if (queryParams["name"] is not null)
+                    {
+                        data = data.Replace("{{World}}", HttpUtility.HtmlEncode(queryParams["name"]));
+                        head.Append($"Set-Cookie: name={HttpUtility.UrlEncode(queryParams["name"])}\r\n");
+                    }
+                    else
+                    {
+                        var cookie = request.Headers.FirstOrDefault(h => h.Name == "Cookie")?.Value;
+                        if (cookie != null)
+                        {
+                            var pairs = cookie.Split(";");
+                            foreach (var pair in pairs)
+                            {
+                                var split = pair.Split("=");
+                                var name = split[0].Trim();
+                                var value = split[1];
+                                if (name == "name")
+                                    data = data.Replace("{{World}}", HttpUtility.HtmlEncode(HttpUtility.UrlDecode(value)));
+                            }
+                        }
+                    }
+                    if (queryParams["greeting"] is not null)
+                    {
+                        data = data.Replace("{{Hello}}", HttpUtility.HtmlEncode(queryParams["greeting"]));
+                    }
+
+                    body = Encoding.UTF8.GetBytes(data);
+                    head.Append($"Content-Length: {body.Length}");
+                    head.Append("\r\n\r\n");
+                    break;
+                case "/groot.gif":
+                    head.Append("200 OK\r\nContent-Type: image/gif;\r\nContent-Length: ");
+                    body = File.ReadAllBytes("groot.gif");
+                    head.Append(body.Length);
+                    head.Append("\r\n\r\n");
+                    break;
+                case "/time.html":
+                    head.Append("200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ");
+                    data = File.ReadAllText("time.template.html");
+                    body = Encoding.UTF8.GetBytes(data.Replace("{{ServerTime}}", DateTime.Now.ToString(CultureInfo.InvariantCulture)));
+                    head.Append(body.Length);
+                    head.Append("\r\n\r\n");
+                    break;
+                default:
+                    head.Append("404 Not Found\r\n\r\n");
+                    body = Array.Empty<byte>();
+                    break;
+            }
+            
             return CreateResponseBytes(head, body);
         }
 
