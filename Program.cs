@@ -159,6 +159,8 @@ namespace Sockets
 
         private static byte[] ProcessRequest(Request request)
         {
+            return RequestHandler.Process(request);
+            var page = request.RequestUri;
             // TODO
             var head = new StringBuilder("OK");
             var body = new byte[0];
